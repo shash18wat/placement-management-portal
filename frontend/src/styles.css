@@ -586,3 +586,39 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .company-record-heading { flex-direction: column; }
   .dialog-actions { align-items: stretch; flex-direction: column-reverse; }
 }
+
+@media (max-width: 1050px) {
+  .sidebar { width: 226px; flex-basis: 226px; }
+  .content-area { padding-right: 30px; padding-left: 30px; }
+  .topbar, .page-footer { padding-right: 30px; padding-left: 30px; }
+}
+@media (max-width: 760px) {
+  .sidebar { padding: 10px 15px 0; box-shadow: 0 5px 18px rgba(17, 26, 48, .15); }
+  .brand { padding: 0 3px 11px; }
+  .brand-mark { width: 33px; height: 33px; border-radius: 11px; font-size: 20px; }
+  .main-nav { margin-right: -15px; margin-left: -15px; padding: 0 11px 9px; }
+  .nav-item { min-height: 40px; border-radius: 10px; font-size: 11px; }
+  .topbar { position: static; min-height: 55px; padding: 0 18px; }
+  .content-area { padding: 27px 18px 38px; }
+  .page-heading { gap: 12px; margin-bottom: 21px; }
+  .page-heading h1 { font-size: 29px; }
+  .page-description { font-size: 13px; }
+  .status-banner { padding: 14px; border-radius: 13px; }
+  .summary-card { min-height: 105px; padding: 15px; }
+  .summary-value { margin-top: 9px; font-size: 27px; }
+  .summary-card p { margin-top: 5px; }
+  .panel { padding: 18px; }
+  .opportunity-card { min-height: 0; padding: 18px; }
+  .profile-form, .feedback-form, .feedback-results, .management-form { padding: 18px; }
+  .page-footer { padding: 12px 18px; font-size: 10px; }
+  .legal-shell { padding: 24px 16px 42px; }
+}
+@media (max-width: 430px) {
+  .nav-item { padding: 0 8px; }
+  .nav-item span:not(.nav-count) { font-size: 10px; }
+  .title-line { flex-direction: column; gap: 6px; }
+  .opportunity-actions { align-items: stretch; }
+  .opportunity-action-buttons { width: 100%; justify-content: stretch; }
+  .opportunity-action-buttons .button { flex: 1; }
+  .feedback-form, .feedback-results { padding: 16px; }
+}
