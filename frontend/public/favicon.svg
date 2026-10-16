@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Placement Portal">
+  <rect width="48" height="48" rx="8" fill="#203735"/>
+  <path d="M13 35V13h12a8 8 0 0 1 0 16h-5" fill="none" stroke="#f4f5f2" stroke-linecap="square" stroke-width="4"/>
+  <path d="M31 30v5" stroke="#c99a55" stroke-linecap="square" stroke-width="4"/>
+</svg>
