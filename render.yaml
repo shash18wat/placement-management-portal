@@ -7,3 +7,5 @@ services:
     envVars:
       - key: PUBLIC_DEMO
         value: "true"
+      - key: PUBLIC_DEMO_RESUME_UPLOADS
+        value: "true"

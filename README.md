@@ -17,7 +17,7 @@ Three clearly labeled illustrative listings are inserted into a new local databa
 
 ## Important demo security limit
 
-This is a **local demonstration only**. The coordinator endpoints do not require authentication. A person who can reach the API can create or view company, opportunity, and application records. The API is configured for local use and must not be exposed to the public internet. Use fictional data only. Do not submit real student details or resumes.
+This project is a portfolio demonstration, not an institutional placement system. Coordinator endpoints do not require authentication in local mode. On the public demo, coordinator records and management actions remain disabled. Public test uploads are accepted only for illustrative listings and are limited to three attempts per minute per client. Use fictional contact details and a sample file only; never upload real student information or resumes.
 
 Before any public or institutional deployment, add authentication, role-based access, production-grade file handling, protected storage, retention and deletion operations, persistent rate limiting, monitoring, backups, and a security review. Review and finalize the privacy and terms pages with the real operator and contact information.
 
@@ -58,7 +58,7 @@ The Vite development server forwards `/api` requests to FastAPI on port 8000. SQ
 
 ## Public portfolio demo
 
-The public build is a read-only portfolio demonstration. It lists illustrative roles, supports eligibility practice, and provides resume feedback. It does not accept resume uploads or expose coordinator records. Student profile details stay in each visitor's browser. Keep `PUBLIC_DEMO=true` on the public service; the included Docker image defaults to this setting.
+The public build is a portfolio demonstration. It lists illustrative roles, supports eligibility practice, provides resume feedback, and accepts test resume uploads when `PUBLIC_DEMO_RESUME_UPLOADS=true`. Test submissions are stored in the service's temporary local SQLite database and filesystem for up to 24 hours; Render Free may remove them earlier when the service restarts or spins down. The public demo does not expose coordinator records, forward applications to employers, or provide a way for a coordinator to retrieve the test submissions. Do not upload real resumes or personal information. Student profile details stay in each visitor's browser until a test submission is sent.
 
 This project includes a Dockerfile and Render Blueprint for a single-service deployment. To create a live `onrender.com` link:
 
@@ -67,7 +67,7 @@ This project includes a Dockerfile and Render Blueprint for a single-service dep
 3. Wait for the first deploy to finish, then open the service's `onrender.com` address. Render assigns this address automatically.
 4. Leave `GEMINI_API_KEY` unset for built-in feedback. If you choose to enable Gemini, add the key in Render's secret environment settings; never put it in the frontend or repository.
 
-The public service remains a portfolio demo: its sample listings are not current vacancies, resume submissions are disabled, and no applications are sent to employers. Review the privacy and terms drafts and replace the sample listings before presenting the site as an institutional placement service. A custom domain also requires ownership of a domain and DNS configuration. See [Render's Blueprint reference](https://render.com/docs/blueprint-spec) for deployment settings.
+The public service remains a portfolio demo: its sample listings are not current vacancies, test uploads are temporary, and no applications are sent to employers. Review the privacy and terms drafts and replace the sample listings before presenting the site as an institutional placement service. A custom domain also requires ownership of a domain and DNS configuration. See [Render's Blueprint reference](https://render.com/docs/blueprint-spec) for deployment settings.
 
 ## Optional Gemini setup
 
