@@ -7,11 +7,12 @@ import logging
 import os
 import re
 import sqlite3
+import threading
 import time
 import uuid
 import zipfile
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -45,6 +46,11 @@ DATABASE_PATH = DATA_DIR / "placement_portal.sqlite3"
 RESUME_DIR = DATA_DIR / "resumes"
 MAX_RESUME_BYTES = 5 * 1024 * 1024
 PUBLIC_DEMO = os.getenv("PUBLIC_DEMO", "false").strip().lower() in {"1", "true", "yes", "on"}
+PUBLIC_DEMO_RESUME_UPLOADS = os.getenv("PUBLIC_DEMO_RESUME_UPLOADS", "false").strip().lower() in {"1", "true", "yes", "on"}
+PUBLIC_DEMO_RESUME_RETENTION_HOURS = 24
+PUBLIC_DEMO_MAX_PENDING_UPLOADS = 20
+_last_public_demo_purge = 0.0
+_public_demo_purge_lock = threading.Lock()
 
 
 def _require_local_mode() -> None:
@@ -228,14 +234,52 @@ def _eligibility(opportunity: sqlite3.Row, gpa: float | None, active_backlogs: i
     return {"status": status, "criteria": criteria, "reasons": reasons + missing}
 
 
-def _limit_requests(client_key: str) -> None:
+def _limit_requests(client_key: str, *, max_requests: int = RATE_MAX_REQUESTS, message: str = "Review limit reached. Wait a minute before trying again.") -> None:
     now = time.monotonic()
     history = request_times[client_key]
     while history and now - history[0] > RATE_WINDOW_SECONDS:
         history.popleft()
-    if len(history) >= RATE_MAX_REQUESTS:
-        raise HTTPException(status_code=429, detail="Review limit reached. Wait a minute before trying again.")
+    if len(history) >= max_requests:
+        raise HTTPException(status_code=429, detail=message)
     history.append(now)
+
+
+def _purge_expired_public_demo_submissions() -> None:
+    if not PUBLIC_DEMO:
+        return
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=PUBLIC_DEMO_RESUME_RETENTION_HOURS)).isoformat()
+    connection = _database()
+    try:
+        expired = connection.execute(
+            """SELECT applications.id, applications.resume_path FROM applications
+            JOIN opportunities ON opportunities.id = applications.opportunity_id
+            WHERE opportunities.example = 1 AND applications.submitted_at <= ?""",
+            (cutoff,),
+        ).fetchall()
+        for row in expired:
+            stored_path = (RESUME_DIR / row["resume_path"]).resolve()
+            if stored_path.is_relative_to(RESUME_DIR.resolve()) and stored_path.exists():
+                stored_path.unlink()
+        if expired:
+            connection.executemany("DELETE FROM applications WHERE id = ?", [(row["id"],) for row in expired])
+            connection.commit()
+    finally:
+        connection.close()
+
+
+def _maybe_purge_expired_public_demo_submissions() -> None:
+    global _last_public_demo_purge
+    if not PUBLIC_DEMO or not PUBLIC_DEMO_RESUME_UPLOADS:
+        return
+    with _public_demo_purge_lock:
+        now = time.monotonic()
+        if now - _last_public_demo_purge < 300:
+            return
+        try:
+            _purge_expired_public_demo_submissions()
+        except (OSError, sqlite3.Error):
+            logger.warning("Could not purge expired demo uploads", exc_info=True)
+        _last_public_demo_purge = now
 
 
 def _local_feedback(data: FeedbackRequest, note: str | None = None) -> dict[str, Any]:
@@ -384,13 +428,24 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.middleware("http")
+async def purge_old_demo_uploads(request: FastAPIRequest, call_next):
+    if request.url.path.startswith("/api/"):
+        await asyncio.to_thread(_maybe_purge_expired_public_demo_submissions)
+    return await call_next(request)
+
+
 @app.get("/api/status")
 def status() -> dict[str, Any]:
+    _purge_expired_public_demo_submissions()
     return {
         "ai_enabled": bool(os.getenv("GEMINI_API_KEY", "").strip()),
         "feedback_is_persisted": False,
         "demo_mode": True,
         "public_demo": PUBLIC_DEMO,
+        "resume_uploads_enabled": not PUBLIC_DEMO or PUBLIC_DEMO_RESUME_UPLOADS,
+        "resume_uploads_are_temporary": PUBLIC_DEMO and PUBLIC_DEMO_RESUME_UPLOADS,
+        "resume_retention_hours": PUBLIC_DEMO_RESUME_RETENTION_HOURS if PUBLIC_DEMO_RESUME_UPLOADS else None,
     }
 
 
@@ -589,6 +644,7 @@ def update_application_status(application_id: str, data: ApplicationStatusUpdate
 
 @app.post("/api/resume-submissions", status_code=201)
 async def submit_resume(
+    request: FastAPIRequest,
     opportunity_id: str = Form(min_length=1, max_length=40),
     full_name: str = Form(min_length=2, max_length=120),
     email: str = Form(min_length=5, max_length=254),
@@ -598,7 +654,16 @@ async def submit_resume(
     active_backlogs: int | None = Form(default=None, ge=0, le=20),
     resume: UploadFile = File(...),
 ) -> dict[str, Any]:
-    _require_local_mode()
+    if PUBLIC_DEMO and not PUBLIC_DEMO_RESUME_UPLOADS:
+        _require_local_mode()
+    if PUBLIC_DEMO:
+        client_key = request.client.host if request.client else "unknown"
+        _limit_requests(
+            "resume:" + client_key,
+            max_requests=3,
+            message="Demo upload limit reached. Wait a minute before trying again.",
+        )
+        _purge_expired_public_demo_submissions()
     if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
         raise HTTPException(status_code=422, detail="Enter a valid email address.")
     if not re.fullmatch(r"20\d{2}", graduation_year):
@@ -625,10 +690,19 @@ async def submit_resume(
         opportunity = _get_opportunity(connection, opportunity_id)
         if opportunity is None:
             raise HTTPException(status_code=404, detail="Opportunity not found.")
+        if PUBLIC_DEMO and not opportunity["example"]:
+            raise HTTPException(status_code=404, detail="Only illustrative opportunities are available in the public demo.")
         eligibility = _eligibility(opportunity, gpa, active_backlogs)
         if eligibility["status"] not in {"eligible", "criteria_not_set"}:
             detail = "Your profile details do not meet this opportunity's example criteria." if eligibility["status"] == "not_eligible" else "Complete the eligibility details before submitting."
             raise HTTPException(status_code=409, detail={"message": detail, "eligibility": eligibility})
+        if PUBLIC_DEMO:
+            active_demo_submissions = connection.execute(
+                """SELECT COUNT(*) FROM applications JOIN opportunities ON opportunities.id = applications.opportunity_id
+                WHERE opportunities.example = 1"""
+            ).fetchone()[0]
+            if active_demo_submissions >= PUBLIC_DEMO_MAX_PENDING_UPLOADS:
+                raise HTTPException(status_code=429, detail="The temporary demo upload limit has been reached. Please try again later.")
         RESUME_DIR.mkdir(parents=True, exist_ok=True)
         submission_id = str(uuid.uuid4())
         stored_name = submission_id + extension
@@ -656,7 +730,11 @@ async def submit_resume(
             "resume_name": display_name,
             "status": "Received in local demo",
             "submitted_at": submitted_at,
-            "message": "The resume was stored on this local server. No employer was contacted.",
+            "message": (
+                "Demo resume received. It is stored temporarily for up to 24 hours and is not sent to an employer."
+                if PUBLIC_DEMO
+                else "The resume was stored on this local server. No employer was contacted."
+            ),
         }
     finally:
         connection.close()
