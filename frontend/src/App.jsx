@@ -161,7 +161,13 @@ function ProfileProgress({ profile }) {
 function LegalPage({ kind }) {
   const privacy = kind === 'privacy'
   const [publicDemo, setPublicDemo] = useState(true)
-  useEffect(() => { fetch('/api/status').then((response) => response.ok ? response.json() : null).then((data) => setPublicDemo(Boolean(data?.public_demo))).catch(() => {}) }, [])
+  const [resumeUploadsEnabled, setResumeUploadsEnabled] = useState(false)
+  useEffect(() => {
+    fetch('/api/status').then((response) => response.ok ? response.json() : null).then((data) => {
+      setPublicDemo(Boolean(data?.public_demo))
+      setResumeUploadsEnabled(Boolean(data?.resume_uploads_enabled))
+    }).catch(() => {})
+  }, [])
   return (
     <main className="legal-shell">
       <a className="back-link" href="/"><Icon name="arrow" size={17} /> Return to portal</a>
@@ -169,7 +175,7 @@ function LegalPage({ kind }) {
         <p className="eyebrow">PLACEMENT MANAGEMENT PORTAL</p>
         <h1>{privacy ? 'Privacy and data use' : 'Terms of use'}</h1>
         <p className="legal-date">Project draft · 17 October 2026</p>
-        {privacy ? <PrivacyContent publicDemo={publicDemo} /> : <TermsContent publicDemo={publicDemo} />}
+        {privacy ? <PrivacyContent publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} /> : <TermsContent publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} />}
         <div className="legal-draft-note">
           <strong>Before a public launch:</strong> the project owner must identify the operating institution, add a monitored privacy contact, set a retention period, and review these draft terms for the laws and policies that apply to the deployment.
         </div>
@@ -179,23 +185,29 @@ function LegalPage({ kind }) {
   )
 }
 
-function PrivacyContent({ publicDemo }) {
+function PrivacyContent({ publicDemo, resumeUploadsEnabled }) {
+  const publicUploadNotice = resumeUploadsEnabled
+    ? 'A public test upload includes the profile details entered for that submission and a PDF or DOCX file. The server stores these files temporarily for up to 24 hours; Render may remove them earlier when the free service restarts or spins down. Submissions are not sent to employers, and the public demo has no coordinator records screen. Use fictional details and a sample file only.'
+    : 'Resume uploads and coordinator record access are disabled in public mode.'
   return (
     <div className="legal-copy">
-      <section><h2>What this project stores</h2>{publicDemo ? <><p>This public portfolio demo has no user accounts. Your profile and saved roles stay in your browser. Eligibility requests send only the listing ID, GPA, and backlog count to the API for comparison; the API does not save those values. Resume uploads and coordinator record access are disabled in public mode.</p><p>The feedback service receives the role, skills, and text you submit. This demo uses built-in checks unless an AI provider is explicitly configured. If Gemini is enabled, the page asks for consent before sending the text to Google. Do not include contact details or sensitive information.</p></> : <><p>This local portfolio demo has no user accounts or coordinator sign-in. Your student profile is saved in local browser storage. Company, opportunity, and application records are stored by the local FastAPI service in a SQLite database under the project data folder. A submitted PDF or DOCX resume is stored there as a separate file. These records are not sent to an employer or placement office.</p><p>The coordinator screens are available without authentication in this local demo. Anyone who can reach the service can view or change those records. Use fictional data only, keep the service bound to your own computer, and do not expose it to the internet.</p></>}</section>
+      <section><h2>What this project stores</h2>{publicDemo ? <><p>This public portfolio demo has no user accounts. Your profile and saved roles stay in your browser. Eligibility requests send only the listing ID, GPA, and backlog count to the API for comparison; the API does not save those values. {publicUploadNotice}</p><p>The feedback service receives the role, skills, and text you submit. This demo uses built-in checks unless an AI provider is explicitly configured. If Gemini is enabled, the page asks for consent before sending the text to Google. Do not include contact details or sensitive information in feedback.</p></> : <><p>This local portfolio demo has no user accounts or coordinator sign-in. Your student profile is saved in local browser storage. Company, opportunity, and application records are stored by the local FastAPI service in a SQLite database under the project data folder. A submitted PDF or DOCX resume is stored there as a separate file. These records are not sent to an employer or placement office.</p><p>The coordinator screens are available without authentication in this local demo. Anyone who can reach the service can view or change those records. Use fictional data only, keep the service bound to your own computer, and do not expose it to the internet.</p></>}</section>
       <section><h2>AI feedback</h2><p>When the Gemini service is not configured, the built-in review checks the text you submit and does not call an external AI provider. When Gemini is configured, the target role, skills, and resume summary are sent from the server to Google Gemini only after you choose to request feedback and confirm the notice. The portal API does not store review text.</p><p>Do not submit contact details, protected or sensitive personal information, or real applicant records to this portfolio demo. AI suggestions can be incomplete or wrong and should be reviewed by a person.</p></section>
       <section><h2>Analytics and cookies</h2><p>This build does not include advertising trackers, analytics scripts, or third-party review widgets. Browser storage is used for the profile and SQLite plus local files are used for coordinator and application demo data.</p></section>
-      <section><h2>Data control</h2><p>Clear your profile by clearing this site's browser data. Remove a submitted demo application from the Applications page to delete its database record and stored resume file. Company and opportunity records can be removed from the Companies page when no applications depend on them. The project owner can reset all demo records by stopping the service and deleting the project data folder.</p><p>A future institutional deployment must document its data controller, access rules, retention period, deletion process, and contact channel before collecting real student or employer information.</p></section>
+      <section><h2>Data control</h2><p>{publicDemo ? 'Clear your profile by clearing this site’s browser data. Public test uploads are not available in a coordinator dashboard; the demo removes their records after 24 hours on subsequent activity, and Render may erase them earlier when its free service restarts or spins down.' : 'Clear your profile by clearing this site’s browser data. Remove a submitted demo application from the Applications page to delete its database record and stored resume file. Company and opportunity records can be removed from the Companies page when no applications depend on them. The project owner can reset all demo records by stopping the service and deleting the project data folder.'}</p><p>A future institutional deployment must document its data controller, access rules, retention period, deletion process, and contact channel before collecting real student or employer information.</p></section>
     </div>
   )
 }
 
-function TermsContent({ publicDemo }) {
+function TermsContent({ publicDemo, resumeUploadsEnabled }) {
+  const publicUploadNotice = resumeUploadsEnabled
+    ? 'The public demo accepts test uploads for illustrative opportunities. Use fictional profile details and a sample resume only. Files are stored temporarily for up to 24 hours and may be removed earlier when the free service restarts or spins down. No employer receives the submission.'
+    : 'Resume submissions and coordinator records are disabled.'
   return (
     <div className="legal-copy">
       <section><h2>Demo use</h2><p>This portal is a portfolio demonstration. Example opportunity listings are illustrative and are not job offers. This project is not affiliated with a university, employer, or recruitment agency.</p></section>
       <section><h2>Career feedback</h2><p>Resume feedback is educational guidance only. It is not a hiring recommendation, guarantee of employment, or professional career service. Do not use the feedback as the sole basis for a hiring, admission, or placement decision.</p></section>
-      <section><h2>Your information</h2><p>{publicDemo ? 'Use non-sensitive text in this public demo. Profile and saved roles remain in your browser. Resume submissions and coordinator records are disabled. Feedback text is sent to the demo API and may be processed by Gemini only if enabled and after consent, as described on the privacy page.' : 'Use fictional or non-sensitive information in this demo. The local API stores application details and uploaded resumes on the computer running the server. You are responsible for ensuring that anything you submit is accurate and that you have permission to share it. If Gemini is enabled, the text you choose to review is processed by that provider as described on the privacy page.'}</p></section>
+      <section><h2>Your information</h2><p>{publicDemo ? `Use non-sensitive text in this public demo. Profile and saved roles remain in your browser. ${publicUploadNotice} Feedback text is sent to the demo API and may be processed by Gemini only if enabled and after consent, as described on the privacy page.` : 'Use fictional or non-sensitive information in this demo. The local API stores application details and uploaded resumes on the computer running the server. You are responsible for ensuring that anything you submit is accurate and that you have permission to share it. If Gemini is enabled, the text you choose to review is processed by that provider as described on the privacy page.'}</p></section>
       <section><h2>Public deployment</h2><p>{publicDemo ? 'This public site is a portfolio demonstration with example opportunities, eligibility checks, and resume feedback. It is not a real university placement service, and it does not transmit applications to employers.' : 'This portfolio build does not include identity verification, role-based access control, or protected multi-user data storage. It is not ready to handle real student records or live recruitment applications. A deployment operator must add authentication, permissions, secure file handling, privacy operations, and reviewed policies before real use.'}</p></section>
     </div>
   )
@@ -213,6 +225,7 @@ function App() {
   const [applications, setApplications] = useState([])
   const [portalConnected, setPortalConnected] = useState(false)
   const [publicDemo, setPublicDemo] = useState(false)
+  const [resumeUploadsEnabled, setResumeUploadsEnabled] = useState(false)
   const [selectedOpportunity, setSelectedOpportunity] = useState(null)
   const [eligibilityById, setEligibilityById] = useState({})
   const [query, setQuery] = useState('')
@@ -249,6 +262,7 @@ function App() {
       setOpportunities(opportunityData)
       setApplications(applicationData)
       setPublicDemo(Boolean(statusData.public_demo))
+      setResumeUploadsEnabled(Boolean(statusData.resume_uploads_enabled))
       setGeminiEnabled(Boolean(statusData.ai_enabled))
       setPortalConnected(true)
     } catch {
@@ -256,6 +270,7 @@ function App() {
       setOpportunities(initialLocalOpportunities())
       setApplications([])
       setPublicDemo(false)
+      setResumeUploadsEnabled(false)
       setGeminiEnabled(false)
       setPortalConnected(false)
     }
@@ -287,6 +302,10 @@ function App() {
     : navItems
 
   function handleApply(job) {
+    if (!resumeUploadsEnabled) {
+      showNotice('Resume uploads are currently disabled for this site.')
+      return
+    }
     if (!profile.fullName || !profile.email || !profile.program || !profile.graduationYear) {
       showNotice('Add your name, email, program, and graduation year before submitting a resume.')
       goTo('profile')
@@ -365,10 +384,14 @@ function App() {
       const message = typeof detail === 'string' ? detail : detail?.message || 'Resume submission failed.'
       throw new Error(message)
     }
-    await refreshPortalData()
     setSelectedOpportunity(null)
-    goTo('applications')
-    showNotice('Resume received by the local demo server. No employer was contacted.')
+    if (publicDemo) {
+      showNotice('Test resume received. It is not sent to an employer and may be deleted within 24 hours or sooner.')
+    } else {
+      await refreshPortalData()
+      goTo('applications')
+      showNotice('Resume received by the local demo server. No employer was contacted.')
+    }
   }
 
   function syncProfileToReview(source = profile) {
@@ -428,7 +451,7 @@ function App() {
             <Icon name="profile" size={19} /><span>Student profile</span>
           </button>
           <div className="sidebar-rule" />
-          <p className="sidebar-note">{publicDemo ? 'Public portfolio demo. Listings are examples; resume submissions and coordinator records are disabled.' : 'Local demo only. Coordinator screens have no sign-in. Do not enter real student records.'}</p>
+          <p className="sidebar-note">{publicDemo ? (resumeUploadsEnabled ? 'Public portfolio demo. Test uploads only; records are temporary and coordinator access is disabled.' : 'Public portfolio demo. Listings are examples; resume submissions and coordinator records are disabled.') : 'Local demo only. Coordinator screens have no sign-in. Do not enter real student records.'}</p>
           <div className="sidebar-legal"><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
         </div>
       </aside>
@@ -443,9 +466,9 @@ function App() {
         </header>
 
         <main id="main-content" className="content-area">
-          {section === 'overview' && <Overview profile={profile} profileComplete={profileComplete} applications={applications} companies={companies} opportunities={opportunities} publicDemo={publicDemo} geminiEnabled={geminiEnabled} onNavigate={goTo} onReview={syncProfileToReview} />}
+          {section === 'overview' && <Overview profile={profile} profileComplete={profileComplete} applications={applications} companies={companies} opportunities={opportunities} publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} geminiEnabled={geminiEnabled} onNavigate={goTo} onReview={syncProfileToReview} />}
           {section === 'companies' && <CompanyManagement companies={companies} opportunities={opportunities} onRefresh={refreshPortalData} onNotice={showNotice} connected={portalConnected} />}
-          {section === 'opportunities' && <Opportunities query={query} setQuery={setQuery} roles={filteredOpportunities} applications={applications} eligibilityById={eligibilityById} onCheck={checkEligibility} onApply={handleApply} connected={portalConnected} publicDemo={publicDemo} />}
+          {section === 'opportunities' && <Opportunities query={query} setQuery={setQuery} roles={filteredOpportunities} applications={applications} eligibilityById={eligibilityById} onCheck={checkEligibility} onApply={handleApply} connected={portalConnected} publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} />}
           {section === 'applications' && <Applications items={applications} onRemove={removeApplication} onStatusChange={updateApplicationStatus} onBrowse={() => goTo('opportunities')} connected={portalConnected} />}
           {section === 'profile' && <Profile profile={profile} setProfile={setProfile} onReview={syncProfileToReview} onSaved={() => showNotice('Profile saved in this browser.')} />}
           {section === 'feedback' && <Feedback form={reviewForm} setForm={setReviewForm} onSubmit={requestReview} busy={reviewBusy} result={reviewResult} label={reviewLabel} geminiEnabled={geminiEnabled} consent={consentToAi} setConsent={setConsentToAi} />}
@@ -454,7 +477,7 @@ function App() {
         <footer className="page-footer"><span>Placement Management Portal · Portfolio demonstration</span><span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></span></footer>
       </div>
       {notice && <div className="notice" role="status"><Icon name="check" size={17} />{notice}</div>}
-      {selectedOpportunity && <ApplicationDialog job={selectedOpportunity} profile={profile} onClose={() => setSelectedOpportunity(null)} onSubmit={submitResume} />}
+      {selectedOpportunity && <ApplicationDialog job={selectedOpportunity} profile={profile} publicDemo={publicDemo} onClose={() => setSelectedOpportunity(null)} onSubmit={submitResume} />}
     </div>
   )
 }
@@ -463,13 +486,13 @@ function PageHeading({ eyebrow, title, description, action }) {
   return <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-description">{description}</p></div>{action}</div>
 }
 
-function Overview({ profile, profileComplete, applications, companies, opportunities, publicDemo, geminiEnabled, onNavigate, onReview }) {
+function Overview({ profile, profileComplete, applications, companies, opportunities, publicDemo, resumeUploadsEnabled, geminiEnabled, onNavigate, onReview }) {
   const firstName = profile.fullName.trim().split(/\s+/)[0]
   const submitted = applications.length
   const offers = applications.filter((application) => application.status === 'Offer').length
   return (
     <>
-      <PageHeading eyebrow={publicDemo ? 'PUBLIC PORTFOLIO DEMO' : 'STUDENT WORKSPACE'} title={firstName ? 'Welcome, ' + firstName : 'Your placement workspace'} description={publicDemo ? 'Explore illustrative roles, try the eligibility checks, and get focused resume feedback. Your profile stays in this browser.' : 'Review opportunities, keep track of applications you saved, and get focused suggestions for your next application.'} />
+      <PageHeading eyebrow={publicDemo ? 'PUBLIC PORTFOLIO DEMO' : 'STUDENT WORKSPACE'} title={firstName ? 'Welcome, ' + firstName : 'Your placement workspace'} description={publicDemo ? (resumeUploadsEnabled ? 'Explore example roles, test a resume upload with fictional details, and get focused feedback. Demo uploads are temporary.' : 'Explore illustrative roles, try the eligibility checks, and get focused resume feedback. Your profile stays in this browser.') : 'Review opportunities, keep track of applications you saved, and get focused suggestions for your next application.'} />
       <div className="status-banner">
         <div className="status-banner-icon"><Icon name={profileComplete ? 'check' : 'profile'} size={20} /></div>
         <div className="status-banner-copy"><strong>{profileComplete ? 'Your profile is ready for a review' : 'Start with your student profile'}</strong><span>{profileComplete ? 'Use your role, skills, and resume summary to get specific improvement suggestions.' : 'Add your study program and target role to make the workspace useful.'}</span></div>
@@ -498,22 +521,23 @@ function Overview({ profile, profileComplete, applications, companies, opportuni
         <section className="panel activity-panel">
           {publicDemo ? <>
             <div className="panel-heading"><div><p className="eyebrow">TRY THE PORTAL</p><h2>Practice before applying</h2></div></div>
-            <div className="empty-state empty-state--compact"><span className="empty-icon"><Icon name="shield" size={21} /></span><strong>No real applications are sent</strong><p>Listings are illustrative. This public demo does not accept resumes or create coordinator records.</p><button className="text-button" onClick={() => onNavigate('feedback')}>Try resume feedback <Icon name="arrow" size={15} /></button></div>
+            <div className="empty-state empty-state--compact"><span className="empty-icon"><Icon name="shield" size={21} /></span><strong>{resumeUploadsEnabled ? 'Try a sample resume upload' : 'No real applications are sent'}</strong><p>{resumeUploadsEnabled ? 'Uploads are for testing only, are removed within 24 hours or sooner, and are not sent to employers. Use fictional details and a sample file.' : 'Listings are illustrative. This public demo does not accept resumes or create coordinator records.'}</p>{resumeUploadsEnabled && <button className="text-button" onClick={() => onNavigate('opportunities')}>Try an upload <Icon name="arrow" size={15} /></button>}<button className="text-button" onClick={() => onNavigate('feedback')}>Try resume feedback <Icon name="arrow" size={15} /></button></div>
           </> : <>
             <div className="panel-heading"><div><p className="eyebrow">RECENT ACTIVITY</p><h2>Resume submissions</h2></div><button className="text-button" onClick={() => onNavigate('applications')}>View all</button></div>
             {applications.length === 0 ? <div className="empty-state empty-state--compact"><span className="empty-icon"><Icon name="applications" size={21} /></span><strong>No resumes submitted</strong><p>Eligible applications you submit in this demo will appear here. No employer is contacted.</p><button className="text-button" onClick={() => onNavigate('opportunities')}>Browse opportunities <Icon name="arrow" size={15} /></button></div> : <div className="mini-app-list">{applications.slice(0, 4).map((item) => <div className="mini-app" key={item.id}><span className="mini-app-mark"><Icon name="document" size={17} /></span><span><strong>{item.role}</strong><small>{item.organization} · {new Date(item.submitted_at).toLocaleDateString()}</small></span><span className="status-chip">{item.status}</span></div>)}</div>}
           </>}
         </section>
       </div>
-      <p className="demo-caption"><Icon name="shield" size={15} />{publicDemo ? 'Example listings are marked. Profile information stays in this browser; no resume is sent.' : 'Example listings are marked. No real applications are sent from this portfolio build.'}</p>
+      <p className="demo-caption"><Icon name="shield" size={15} />{publicDemo ? (resumeUploadsEnabled ? 'Use fictional profile details and a sample file. Demo uploads are temporary and no employer receives them.' : 'Example listings are marked. Profile information stays in this browser; resume uploads are disabled.') : 'Example listings are marked. No real applications are sent from this portfolio build.'}</p>
     </>
   )
 }
 
-function Opportunities({ query, setQuery, roles, applications, eligibilityById, onCheck, onApply, connected, publicDemo }) {
+function Opportunities({ query, setQuery, roles, applications, eligibilityById, onCheck, onApply, connected, publicDemo, resumeUploadsEnabled }) {
   return (
     <>
-      <PageHeading eyebrow="ROLE EXPLORER" title="Opportunities" description={publicDemo ? 'Browse illustrative roles and try the eligibility checks. These sample listings do not accept applications.' : "Check each listing's stated criteria, then submit a resume to the local demo server. No employer receives your information."} />
+      <PageHeading eyebrow="ROLE EXPLORER" title="Opportunities" description={publicDemo ? (resumeUploadsEnabled ? 'Browse illustrative roles and test the upload flow with a sample resume. No employer receives test submissions.' : 'Browse illustrative roles and try the eligibility checks. These sample listings do not accept applications.') : "Check each listing's stated criteria, then submit a resume to the local demo server. No employer receives your information."} />
+      {publicDemo && resumeUploadsEnabled && <div className="inline-warning demo-upload-warning">Test uploads only: use fictional profile details and a sample PDF or DOCX. Files are kept for up to 24 hours and may be removed sooner if Render restarts the free service. The demo does not forward applications to employers or provide coordinator access.</div>}
       <div className="search-toolbar"><label className="search-box"><Icon name="search" size={19} /><input aria-label="Search opportunities" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search role, skill, or location" /></label><span className="result-count">{roles.length} {roles.length === 1 ? 'listing' : 'listings'}</span></div>
       {roles.length === 0 ? <div className="panel empty-state"><span className="empty-icon"><Icon name="search" size={22} /></span><h2>No matching listings</h2><p>Try another role title, skill, or location.</p></div> : <div className="opportunity-list">{roles.map((job) => {
         const alreadyApplied = applications.some((application) => application.opportunity_id === job.id)
@@ -525,7 +549,7 @@ function Opportunities({ query, setQuery, roles, applications, eligibilityById, 
           <div className="skill-tags">{job.skills.map((skill) => <span className="skill-tag" key={skill}>{skill}</span>)}</div>
           {(job.minimum_gpa != null || job.maximum_backlogs != null) && <p className="criteria-line">{job.minimum_gpa != null ? 'Minimum GPA ' + Number(job.minimum_gpa).toFixed(1) : ''}{job.minimum_gpa != null && job.maximum_backlogs != null ? ' · ' : ''}{job.maximum_backlogs != null ? 'Maximum ' + job.maximum_backlogs + ' active backlogs' : ''}</p>}
           {eligibility && <div className={'eligibility-result eligibility-result--' + eligibility.status}><strong>{eligibility.status.replaceAll('_', ' ')}</strong>{eligibility.reasons.map((reason, index) => <span key={index}>{reason}</span>)}</div>}
-          <div className="opportunity-actions"><span className="privacy-inline"><Icon name="shield" size={15} />{publicDemo ? 'Illustrative listing' : 'Local demo only'}</span><div className="opportunity-action-buttons"><button className="button button--secondary" onClick={() => onCheck(job)} disabled={!connected}>Check eligibility</button>{!publicDemo && <button className={'button ' + (alreadyApplied ? 'button--saved' : 'button--primary')} onClick={() => onApply(job)} disabled={alreadyApplied || !connected}>{alreadyApplied ? 'Resume received' : 'Submit resume'}</button>}</div></div>
+          <div className="opportunity-actions"><span className="privacy-inline"><Icon name="shield" size={15} />{publicDemo ? 'Illustrative listing' : 'Local demo only'}</span><div className="opportunity-action-buttons"><button className="button button--secondary" onClick={() => onCheck(job)} disabled={!connected}>Check eligibility</button>{(!publicDemo || resumeUploadsEnabled) && <button className={'button ' + (alreadyApplied ? 'button--saved' : 'button--primary')} onClick={() => onApply(job)} disabled={alreadyApplied || !connected}>{alreadyApplied ? 'Resume received' : publicDemo ? 'Upload test resume' : 'Submit resume'}</button>}</div></div>
         </article>
       })}</div>}
       <p className="disclaimer-note">These example listings are for demonstration only. Replace them with verified postings before using this portal with students.</p>
@@ -662,14 +686,16 @@ function CompanyManagement({ companies, opportunities, onRefresh, onNotice, conn
   )
 }
 
-function ApplicationDialog({ job, profile, onClose, onSubmit }) {
+function ApplicationDialog({ job, profile, publicDemo, onClose, onSubmit }) {
   const [resume, setResume] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [testOnlyConfirmed, setTestOnlyConfirmed] = useState(false)
 
   async function submit(event) {
     event.preventDefault()
     if (!resume) { setError('Choose a PDF or DOCX resume.'); return }
+    if (publicDemo && !testOnlyConfirmed) { setError('Confirm that you are using fictional details and a sample file.'); return }
     setBusy(true)
     setError('')
     const body = new FormData()
@@ -684,7 +710,7 @@ function ApplicationDialog({ job, profile, onClose, onSubmit }) {
     try { await onSubmit(body) } catch (submissionError) { setError(submissionError.message || 'Resume submission failed.') } finally { setBusy(false) }
   }
 
-  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><section className="submission-dialog" role="dialog" aria-modal="true" aria-labelledby="submission-title"><button className="dialog-close icon-button" onClick={onClose} aria-label="Close" disabled={busy}><Icon name="close" size={19} /></button><p className="eyebrow">LOCAL DEMO SUBMISSION</p><h2 id="submission-title">Submit resume for {job.role}</h2><p className="dialog-copy">{job.organization}. Your file will be stored on the computer running this demo. No employer will be contacted.</p><form onSubmit={submit}><div className="file-drop"><label htmlFor="resume-file">Resume file</label><input id="resume-file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => { setResume(event.target.files?.[0] || null); setError('') }} required /><small>PDF or DOCX, up to 5 MB.</small></div><p className="submission-person">Submitting as <strong>{profile.fullName}</strong><br />{profile.program} · Class of {profile.graduationYear}</p>{error && <p className="form-error" role="alert">{error}</p>}<div className="dialog-actions"><button type="button" className="button button--secondary" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" className="button button--primary" disabled={busy}>{busy ? 'Submitting…' : 'Submit to local demo'}</button></div></form></section></div>
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}><section className="submission-dialog" role="dialog" aria-modal="true" aria-labelledby="submission-title"><button className="dialog-close icon-button" onClick={onClose} aria-label="Close" disabled={busy}><Icon name="close" size={19} /></button><p className="eyebrow">{publicDemo ? 'PUBLIC TEST UPLOAD' : 'LOCAL DEMO SUBMISSION'}</p><h2 id="submission-title">{publicDemo ? 'Upload a sample resume for ' : 'Submit resume for '}{job.role}</h2><p className="dialog-copy">{publicDemo ? 'This public demo stores the test file temporarily for up to 24 hours; Render may remove it sooner when the free service restarts. Use fictional profile details and a sample file only. It is not sent to an employer or available in a coordinator dashboard.' : job.organization + '. Your file will be stored on the computer running this demo. No employer will be contacted.'}</p><form onSubmit={submit}><div className="file-drop"><label htmlFor="resume-file">Resume file</label><input id="resume-file" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(event) => { setResume(event.target.files?.[0] || null); setError('') }} required /><small>PDF or DOCX, up to 5 MB.</small></div><p className="submission-person">Submitting as <strong>{profile.fullName}</strong><br />{profile.program} · Class of {profile.graduationYear}</p>{publicDemo && <label className="demo-upload-consent"><input type="checkbox" checked={testOnlyConfirmed} onChange={(event) => setTestOnlyConfirmed(event.target.checked)} /><span>I will use fictional profile details and a sample resume. I understand this is a temporary test submission and is not sent to employers.</span></label>}{error && <p className="form-error" role="alert">{error}</p>}<div className="dialog-actions"><button type="button" className="button button--secondary" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" className="button button--primary" disabled={busy || (publicDemo && !testOnlyConfirmed)}>{busy ? 'Submitting…' : publicDemo ? 'Send test resume' : 'Submit to local demo'}</button></div></form></section></div>
 }
 
 function Field({ label, value, onChange, placeholder, type = 'text', multiline = false, hint, autoComplete, inputMode, min, max, step }) {

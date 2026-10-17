@@ -283,6 +283,9 @@ h1, h2, h3, h4 { font-family: 'Segoe UI', Arial, sans-serif; }
 .file-drop small { color: var(--muted); font-size: 10px; }
 .submission-person { margin: 16px 0; color: var(--muted); font-size: 10px; line-height: 1.7; }
 .submission-person strong { color: var(--ink); }
+.demo-upload-consent { display: flex; align-items: flex-start; gap: 9px; margin: 14px 0; color: #526078; font-size: 11px; line-height: 1.55; }
+.demo-upload-consent input { flex: 0 0 auto; margin: 2px 0 0; accent-color: #4f46e5; }
+.demo-upload-warning { margin: -5px 0 17px; }
 .form-error { margin: 12px 0; color: #8f463d; font-size: 11px; line-height: 1.5; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
 
@@ -476,6 +479,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .submission-dialog { border-color: var(--line); border-radius: 17px; box-shadow: 0 24px 70px rgba(17, 26, 48, .24); }
 .submission-dialog h2 { color: #1d2a46; font-size: 21px; font-weight: 700; }
 .dialog-copy, .submission-person { color: #64728a; font-size: 12px; }
+.demo-upload-consent { color: #56647c; font-size: 12px; }
 .file-drop { border-color: #e2e7f0; border-radius: 12px; background: #f8faff; }
 .file-drop label { color: #45536e; font-size: 12px; }
 .file-drop input { font-size: 12px; }
