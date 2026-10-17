@@ -243,14 +243,17 @@ function App() {
   useEffect(() => { saveLocal('placement-portal-profile-v1', profile) }, [profile])
   async function refreshPortalData() {
     try {
-      const [statusResponse, companyResponse, opportunityResponse] = await Promise.all([
-        fetch('/api/status'),
+      // Let the status request finish first: on a fresh Render instance it initializes the demo database.
+      const statusResponse = await fetch('/api/status')
+      if (!statusResponse.ok) throw new Error('Portal API unavailable')
+      const statusData = await statusResponse.json()
+      const [companyResponse, opportunityResponse] = await Promise.all([
         fetch('/api/companies'),
         fetch('/api/opportunities'),
       ])
-      if (!statusResponse.ok || !companyResponse.ok || !opportunityResponse.ok) throw new Error('Portal API unavailable')
-      const [statusData, companyData, opportunityData] = await Promise.all([
-        statusResponse.json(), companyResponse.json(), opportunityResponse.json(),
+      if (!companyResponse.ok || !opportunityResponse.ok) throw new Error('Portal API unavailable')
+      const [companyData, opportunityData] = await Promise.all([
+        companyResponse.json(), opportunityResponse.json(),
       ])
       let applicationData = []
       if (!statusData.public_demo) {
@@ -265,6 +268,7 @@ function App() {
       setResumeUploadsEnabled(Boolean(statusData.resume_uploads_enabled))
       setGeminiEnabled(Boolean(statusData.ai_enabled))
       setPortalConnected(true)
+      return true
     } catch {
       setCompanies([])
       setOpportunities(initialLocalOpportunities())
@@ -273,10 +277,27 @@ function App() {
       setResumeUploadsEnabled(false)
       setGeminiEnabled(false)
       setPortalConnected(false)
+      return false
     }
   }
 
-  useEffect(() => { refreshPortalData() }, [])
+  useEffect(() => {
+    let cancelled = false
+    let retryTimer
+    let retries = 0
+    async function connect() {
+      const connected = await refreshPortalData()
+      if (!connected && !cancelled && retries < 2) {
+        retries += 1
+        retryTimer = window.setTimeout(connect, 1500 * retries)
+      }
+    }
+    connect()
+    return () => {
+      cancelled = true
+      window.clearTimeout(retryTimer)
+    }
+  }, [])
 
   const filteredOpportunities = useMemo(() => opportunities.filter((job) => {
     const text = (job.role + ' ' + job.organization + ' ' + job.location + ' ' + (job.skills || []).join(' ')).toLowerCase()
@@ -477,7 +498,7 @@ function App() {
         </header>
 
         <main id="main-content" className="content-area">
-          {section === 'overview' && <Overview profile={profile} profileComplete={profileComplete} applications={applications} companies={companies} opportunities={opportunities} publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} geminiEnabled={geminiEnabled} onNavigate={goTo} onUpload={handleApply} onReview={syncProfileToReview} />}
+          {section === 'overview' && <Overview profile={profile} profileComplete={profileComplete} applications={applications} companies={companies} opportunities={opportunities} publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} geminiEnabled={geminiEnabled} portalConnected={portalConnected} onNavigate={goTo} onUpload={handleApply} onReview={syncProfileToReview} onRetry={refreshPortalData} />}
           {section === 'companies' && <CompanyManagement companies={companies} opportunities={opportunities} onRefresh={refreshPortalData} onNotice={showNotice} connected={portalConnected} />}
           {section === 'opportunities' && <Opportunities query={query} setQuery={setQuery} roles={filteredOpportunities} applications={applications} eligibilityById={eligibilityById} onCheck={checkEligibility} onApply={handleApply} connected={portalConnected} publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} />}
           {section === 'applications' && <Applications items={applications} onRemove={removeApplication} onStatusChange={updateApplicationStatus} onBrowse={() => goTo('opportunities')} connected={portalConnected} />}
@@ -497,7 +518,7 @@ function PageHeading({ eyebrow, title, description, action }) {
   return <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-description">{description}</p></div>{action}</div>
 }
 
-function Overview({ profile, profileComplete, applications, companies, opportunities, publicDemo, resumeUploadsEnabled, geminiEnabled, onNavigate, onUpload, onReview }) {
+function Overview({ profile, profileComplete, applications, companies, opportunities, publicDemo, resumeUploadsEnabled, geminiEnabled, portalConnected, onNavigate, onUpload, onReview, onRetry }) {
   const [selectedRoleId, setSelectedRoleId] = useState(opportunities[0]?.id || '')
   const firstName = profile.fullName.trim().split(/\s+/)[0]
   const submitted = applications.length
@@ -505,6 +526,7 @@ function Overview({ profile, profileComplete, applications, companies, opportuni
   return (
     <>
       <PageHeading eyebrow={publicDemo ? 'PUBLIC PORTFOLIO DEMO' : 'STUDENT WORKSPACE'} title={firstName ? 'Welcome, ' + firstName : 'Your placement workspace'} description={publicDemo ? (resumeUploadsEnabled ? 'Explore example roles, test a resume upload with fictional details, and get focused feedback. Demo uploads are temporary.' : 'Explore illustrative roles, try the eligibility checks, and get focused resume feedback. Your profile stays in this browser.') : 'Review opportunities, keep track of applications you saved, and get focused suggestions for your next application.'} />
+      {!portalConnected && <div className="portal-connection-warning" role="status"><span>The portal service may be waking after inactivity. Reconnect to load opportunities and enable uploads.</span><button className="button button--secondary" onClick={onRetry}>Retry connection</button></div>}
       <div className="status-banner">
         <div className="status-banner-icon"><Icon name={profileComplete ? 'check' : 'profile'} size={20} /></div>
         <div className="status-banner-copy"><strong>{profileComplete ? 'Your profile is ready for a review' : 'Start with your student profile'}</strong><span>{profileComplete ? 'Use your role, skills, and resume summary to get specific improvement suggestions.' : 'Add your study program and target role to make the workspace useful.'}</span></div>
