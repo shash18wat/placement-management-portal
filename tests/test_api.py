@@ -138,6 +138,7 @@ def test_public_demo_exposes_sample_routes_and_blocks_coordinator_records(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(main, "PUBLIC_DEMO", True)
+    monkeypatch.setattr(main, "PUBLIC_DEMO_RESUME_UPLOADS", False)
 
     assert client.get("/api/status").json()["public_demo"] is True
     companies = client.get("/api/companies")
@@ -168,3 +169,93 @@ def test_public_demo_exposes_sample_routes_and_blocks_coordinator_records(
     )
     assert eligibility.status_code == 200
     assert eligibility.json()["status"] == "eligible"
+
+
+def test_public_demo_accepts_temporary_sample_uploads_but_keeps_records_private(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(main, "PUBLIC_DEMO", True)
+    monkeypatch.setattr(main, "PUBLIC_DEMO_RESUME_UPLOADS", True)
+    main.request_times.clear()
+
+    status = client.get("/api/status").json()
+    assert status["public_demo"] is True
+    assert status["resume_uploads_enabled"] is True
+    assert status["resume_uploads_are_temporary"] is True
+    assert status["resume_retention_hours"] == 24
+
+    response = client.post(
+        "/api/resume-submissions",
+        data={
+            "opportunity_id": "example-frontend-intern",
+            "full_name": "Sample Student",
+            "email": "sample@example.org",
+            "program": "Sample Program",
+            "graduation_year": "2027",
+            "gpa": "8.2",
+            "active_backlogs": "0",
+        },
+        files={"resume": ("sample.pdf", b"%PDF-1.4\nSample content", "application/pdf")},
+    )
+    assert response.status_code == 201
+    assert "temporarily" in response.json()["message"]
+    assert client.get("/api/applications").status_code == 403
+    assert client.post("/api/companies", json={"name": "Public Demo Company"}).status_code == 403
+
+
+def test_public_demo_uploads_are_removed_after_retention_window(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    monkeypatch.setattr(main, "PUBLIC_DEMO", True)
+    monkeypatch.setattr(main, "PUBLIC_DEMO_RESUME_UPLOADS", True)
+    main.request_times.clear()
+    response = client.post(
+        "/api/resume-submissions",
+        data={
+            "opportunity_id": "example-data-associate",
+            "full_name": "Sample Student",
+            "email": "sample@example.org",
+            "program": "Sample Program",
+            "graduation_year": "2027",
+        },
+        files={"resume": ("sample.pdf", b"%PDF-1.4\nSample content", "application/pdf")},
+    )
+    assert response.status_code == 201
+    stored_files = list(main.RESUME_DIR.glob("*.pdf"))
+    assert len(stored_files) == 1
+
+    connection = main._database()
+    try:
+        old_date = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
+        connection.execute("UPDATE applications SET submitted_at = ? WHERE id = ?", (old_date, response.json()["id"]))
+        connection.commit()
+    finally:
+        connection.close()
+    client.get("/api/status")
+    assert not stored_files[0].exists()
+    connection = main._database()
+    try:
+        assert connection.execute("SELECT COUNT(*) FROM applications").fetchone()[0] == 0
+    finally:
+        connection.close()
+
+
+def test_public_demo_uploads_are_rate_limited(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(main, "PUBLIC_DEMO", True)
+    monkeypatch.setattr(main, "PUBLIC_DEMO_RESUME_UPLOADS", True)
+    main.request_times.clear()
+    submission = {
+        "data": {
+            "opportunity_id": "example-data-associate",
+            "full_name": "Sample Student",
+            "email": "sample@example.org",
+            "program": "Sample Program",
+            "graduation_year": "2027",
+        },
+        "files": {"resume": ("sample.pdf", b"%PDF-1.4\nSample content", "application/pdf")},
+    }
+
+    responses = [client.post("/api/resume-submissions", **submission) for _ in range(4)]
+    assert [response.status_code for response in responses] == [201, 201, 201, 429]
