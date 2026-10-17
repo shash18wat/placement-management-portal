@@ -301,14 +301,14 @@ function App() {
     ? navItems.filter((item) => !['companies', 'applications'].includes(item.id))
     : navItems
 
-  function handleApply(job) {
+  async function handleApply(job) {
     if (!resumeUploadsEnabled) {
       showNotice('Resume uploads are currently disabled for this site.')
       return
     }
     if (!profile.fullName || !profile.email || !profile.program || !profile.graduationYear) {
-      showNotice('Add your name, email, program, and graduation year before submitting a resume.')
       goTo('profile')
+      showNotice('Add your name, email, program, and graduation year before uploading a sample resume.')
       return
     }
     if (!portalConnected) {
@@ -319,9 +319,18 @@ function App() {
       showNotice('You already submitted a resume for this opportunity in the local demo.')
       return
     }
-    const eligibility = eligibilityById[job.id]
+    let eligibility = eligibilityById[job.id]
     if (!eligibility || !['eligible', 'criteria_not_set'].includes(eligibility.status)) {
-      showNotice('Check eligibility first and complete any profile details the listing requires.')
+      eligibility = await checkEligibility(job)
+      if (!eligibility) return
+    }
+    if (eligibility.status === 'needs_information') {
+      goTo('profile')
+      showNotice('Add the GPA and active backlog details requested for this role, save your profile, then try the upload again.')
+      return
+    }
+    if (eligibility.status === 'not_eligible') {
+      showNotice('This sample role’s criteria are not met. Review the result or choose another role.')
       return
     }
     setSelectedOpportunity(job)
@@ -346,8 +355,10 @@ function App() {
       const result = await response.json()
       if (!response.ok) throw new Error(result.detail || 'Eligibility check failed')
       setEligibilityById((current) => ({ ...current, [job.id]: result }))
+      return result
     } catch (error) {
       showNotice(typeof error.message === 'string' ? error.message : 'Could not check eligibility.')
+      return null
     }
   }
 
@@ -466,7 +477,7 @@ function App() {
         </header>
 
         <main id="main-content" className="content-area">
-          {section === 'overview' && <Overview profile={profile} profileComplete={profileComplete} applications={applications} companies={companies} opportunities={opportunities} publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} geminiEnabled={geminiEnabled} onNavigate={goTo} onReview={syncProfileToReview} />}
+          {section === 'overview' && <Overview profile={profile} profileComplete={profileComplete} applications={applications} companies={companies} opportunities={opportunities} publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} geminiEnabled={geminiEnabled} onNavigate={goTo} onUpload={handleApply} onReview={syncProfileToReview} />}
           {section === 'companies' && <CompanyManagement companies={companies} opportunities={opportunities} onRefresh={refreshPortalData} onNotice={showNotice} connected={portalConnected} />}
           {section === 'opportunities' && <Opportunities query={query} setQuery={setQuery} roles={filteredOpportunities} applications={applications} eligibilityById={eligibilityById} onCheck={checkEligibility} onApply={handleApply} connected={portalConnected} publicDemo={publicDemo} resumeUploadsEnabled={resumeUploadsEnabled} />}
           {section === 'applications' && <Applications items={applications} onRemove={removeApplication} onStatusChange={updateApplicationStatus} onBrowse={() => goTo('opportunities')} connected={portalConnected} />}
@@ -486,7 +497,8 @@ function PageHeading({ eyebrow, title, description, action }) {
   return <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-description">{description}</p></div>{action}</div>
 }
 
-function Overview({ profile, profileComplete, applications, companies, opportunities, publicDemo, resumeUploadsEnabled, geminiEnabled, onNavigate, onReview }) {
+function Overview({ profile, profileComplete, applications, companies, opportunities, publicDemo, resumeUploadsEnabled, geminiEnabled, onNavigate, onUpload, onReview }) {
+  const [selectedRoleId, setSelectedRoleId] = useState(opportunities[0]?.id || '')
   const firstName = profile.fullName.trim().split(/\s+/)[0]
   const submitted = applications.length
   const offers = applications.filter((application) => application.status === 'Offer').length
@@ -498,6 +510,23 @@ function Overview({ profile, profileComplete, applications, companies, opportuni
         <div className="status-banner-copy"><strong>{profileComplete ? 'Your profile is ready for a review' : 'Start with your student profile'}</strong><span>{profileComplete ? 'Use your role, skills, and resume summary to get specific improvement suggestions.' : 'Add your study program and target role to make the workspace useful.'}</span></div>
         <button className="button button--secondary" onClick={() => profileComplete ? onReview() : onNavigate('profile')}>{profileComplete ? 'Review my resume' : 'Complete profile'}<Icon name="arrow" size={16} /></button>
       </div>
+      <section className="panel resume-tools-panel" aria-label="Resume tools">
+        <div className="panel-heading"><div><p className="eyebrow">RESUME TOOLS</p><h2>Upload a resume or review your summary</h2></div></div>
+        <div className="resume-tool-grid">
+          <div className="resume-tool-card">
+            <span className="action-icon"><Icon name="document" size={19} /></span>
+            <div className="resume-tool-copy"><strong>{publicDemo ? 'Upload a sample resume' : 'Upload a resume'}</strong><p>{resumeUploadsEnabled ? 'Choose a role. The portal checks its example criteria, then opens the file form.' : 'Resume uploads are currently unavailable on this site.'}</p></div>
+            {resumeUploadsEnabled && <div className="resume-tool-controls"><label className="sr-only" htmlFor="overview-upload-role">Choose a role for your resume</label><select id="overview-upload-role" className="inline-select resume-role-select" value={opportunities.some((job) => job.id === selectedRoleId) ? selectedRoleId : opportunities[0]?.id || ''} onChange={(event) => setSelectedRoleId(event.target.value)} disabled={opportunities.length === 0}><option value="" disabled>Select a role</option>{opportunities.map((job) => <option key={job.id} value={job.id}>{job.role}</option>)}</select><button className="button button--primary" onClick={() => { const job = opportunities.find((item) => item.id === selectedRoleId) || opportunities[0]; if (job) onUpload(job) }} disabled={!opportunities.length}>Upload {publicDemo ? 'test ' : ''}resume</button></div>}
+            <small className="resume-tool-note">{publicDemo ? 'Use fictional details and a sample PDF or DOCX only. Test files are temporary and are not sent to employers.' : 'PDF or DOCX, up to 5 MB. This demo does not contact employers.'}</small>
+          </div>
+          <div className="resume-tool-card resume-tool-card--feedback">
+            <span className="action-icon"><Icon name="feedback" size={19} /></span>
+            <div className="resume-tool-copy"><strong>Review my summary</strong><p>Get strengths and practical suggestions for your resume summary. You can use the summary saved in your profile.</p></div>
+            <div className="resume-tool-controls"><button className="button button--secondary" onClick={() => onReview(profile)}>Open AI feedback<Icon name="arrow" size={15} /></button></div>
+            <small className="resume-tool-note">Feedback reviews summary text; uploading a PDF does not automatically extract its text.</small>
+          </div>
+        </div>
+      </section>
       <section className="overview-grid" aria-label="Workspace summary">
         {publicDemo ? <>
           <article className="summary-card"><div className="summary-label">ILLUSTRATIVE ROLES</div><div className="summary-value">{opportunities.length}</div><p>Sample listings for trying the portal</p></article>
@@ -516,12 +545,12 @@ function Overview({ profile, profileComplete, applications, companies, opportuni
           <button className="action-row" onClick={() => onNavigate('opportunities')}><span className="action-icon"><Icon name="roles" size={19} /></span><span className="action-copy"><strong>{publicDemo ? 'Explore example opportunities' : 'Explore opportunities'}</strong><small>{publicDemo ? 'Review sample requirements and try an eligibility check.' : 'Review eligibility criteria and submit a resume to a local demo listing.'}</small></span><Icon name="arrow" size={17} /></button>
           {!publicDemo && <button className="action-row" onClick={() => onNavigate('companies')}><span className="action-icon"><Icon name="roles" size={19} /></span><span className="action-copy"><strong>Manage companies and roles</strong><small>Add fictional employers and their opportunity requirements.</small></span><Icon name="arrow" size={17} /></button>}
           <button className="action-row" onClick={() => onNavigate('profile')}><span className="action-icon"><Icon name="profile" size={19} /></span><span className="action-copy"><strong>Keep your profile current</strong><small>Add skills you can explain with examples.</small></span><Icon name="arrow" size={17} /></button>
-          <button className="action-row" onClick={() => onNavigate('feedback')}><span className="action-icon"><Icon name="feedback" size={19} /></span><span className="action-copy"><strong>Get focused resume feedback</strong><small>See strengths and specific areas to improve.</small></span><Icon name="arrow" size={17} /></button>
+          <button className="action-row" onClick={() => onReview(profile)}><span className="action-icon"><Icon name="feedback" size={19} /></span><span className="action-copy"><strong>Get focused resume feedback</strong><small>See strengths and specific areas to improve.</small></span><Icon name="arrow" size={17} /></button>
         </section>
         <section className="panel activity-panel">
           {publicDemo ? <>
             <div className="panel-heading"><div><p className="eyebrow">TRY THE PORTAL</p><h2>Practice before applying</h2></div></div>
-            <div className="empty-state empty-state--compact"><span className="empty-icon"><Icon name="shield" size={21} /></span><strong>{resumeUploadsEnabled ? 'Try a sample resume upload' : 'No real applications are sent'}</strong><p>{resumeUploadsEnabled ? 'Uploads are for testing only, are removed within 24 hours or sooner, and are not sent to employers. Use fictional details and a sample file.' : 'Listings are illustrative. This public demo does not accept resumes or create coordinator records.'}</p>{resumeUploadsEnabled && <button className="text-button" onClick={() => onNavigate('opportunities')}>Try an upload <Icon name="arrow" size={15} /></button>}<button className="text-button" onClick={() => onNavigate('feedback')}>Try resume feedback <Icon name="arrow" size={15} /></button></div>
+            <div className="empty-state empty-state--compact"><span className="empty-icon"><Icon name="shield" size={21} /></span><strong>{resumeUploadsEnabled ? 'Test uploads only' : 'No real applications are sent'}</strong><p>{resumeUploadsEnabled ? 'Use the resume tools above with fictional details and a sample file. Uploads are temporary and are not sent to employers.' : 'Listings are illustrative. This public demo does not accept resumes or create coordinator records.'}</p><button className="text-button" onClick={() => onReview(profile)}>Try resume feedback <Icon name="arrow" size={15} /></button></div>
           </> : <>
             <div className="panel-heading"><div><p className="eyebrow">RECENT ACTIVITY</p><h2>Resume submissions</h2></div><button className="text-button" onClick={() => onNavigate('applications')}>View all</button></div>
             {applications.length === 0 ? <div className="empty-state empty-state--compact"><span className="empty-icon"><Icon name="applications" size={21} /></span><strong>No resumes submitted</strong><p>Eligible applications you submit in this demo will appear here. No employer is contacted.</p><button className="text-button" onClick={() => onNavigate('opportunities')}>Browse opportunities <Icon name="arrow" size={15} /></button></div> : <div className="mini-app-list">{applications.slice(0, 4).map((item) => <div className="mini-app" key={item.id}><span className="mini-app-mark"><Icon name="document" size={17} /></span><span><strong>{item.role}</strong><small>{item.organization} · {new Date(item.submitted_at).toLocaleDateString()}</small></span><span className="status-chip">{item.status}</span></div>)}</div>}
@@ -536,7 +565,7 @@ function Overview({ profile, profileComplete, applications, companies, opportuni
 function Opportunities({ query, setQuery, roles, applications, eligibilityById, onCheck, onApply, connected, publicDemo, resumeUploadsEnabled }) {
   return (
     <>
-      <PageHeading eyebrow="ROLE EXPLORER" title="Opportunities" description={publicDemo ? (resumeUploadsEnabled ? 'Browse illustrative roles and test the upload flow with a sample resume. No employer receives test submissions.' : 'Browse illustrative roles and try the eligibility checks. These sample listings do not accept applications.') : "Check each listing's stated criteria, then submit a resume to the local demo server. No employer receives your information."} />
+      <PageHeading eyebrow="ROLE EXPLORER" title="Opportunities" description={publicDemo ? (resumeUploadsEnabled ? 'Choose Upload test resume to check the example criteria and open the upload form when they are met. Use a sample file only.' : 'Browse illustrative roles and try the eligibility checks. These sample listings do not accept applications.') : "Choose Submit resume to check each listing's stated criteria and open the local upload form when they are met."} />
       {publicDemo && resumeUploadsEnabled && <div className="inline-warning demo-upload-warning">Test uploads only: use fictional profile details and a sample PDF or DOCX. Files are kept for up to 24 hours and may be removed sooner if Render restarts the free service. The demo does not forward applications to employers or provide coordinator access.</div>}
       <div className="search-toolbar"><label className="search-box"><Icon name="search" size={19} /><input aria-label="Search opportunities" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search role, skill, or location" /></label><span className="result-count">{roles.length} {roles.length === 1 ? 'listing' : 'listings'}</span></div>
       {roles.length === 0 ? <div className="panel empty-state"><span className="empty-icon"><Icon name="search" size={22} /></span><h2>No matching listings</h2><p>Try another role title, skill, or location.</p></div> : <div className="opportunity-list">{roles.map((job) => {
