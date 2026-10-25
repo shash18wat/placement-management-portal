@@ -11,6 +11,7 @@ A local portfolio MVP for placement preparation and recruitment coordination. Th
 - **Resume submission:** Accepts PDF and DOCX files up to 5 MB, performs basic file-type checks, and stores the submission metadata in SQLite and the resume under the local `data/resumes` folder. The demo never contacts an employer.
 - **Application dashboard:** Shows submitted resume records, allows coordinator status updates (received, under review, interview, offer, or not selected), and deletes a local submission and its file when requested. Status updates do not notify candidates.
 - **AI resume feedback:** Uses Gemini only when a server-side `GEMINI_API_KEY` is configured and the user agrees to send the role, skills, and summary. Otherwise, built-in checks give basic feedback without calling an AI provider.
+- **Resume & interview coach:** Extracts PDF/DOCX/TXT text in the browser and gives a heuristic ATS-style checklist. It includes spoken practice questions, an optional local camera preview, answer coaching, and JavaScript DSA questions run in a restricted interpreter. Gemini is used for interview questions/feedback only after explicit consent; no file or video is uploaded by the practice studio.
 - **Privacy and terms pages:** Explain the local demo's current storage behavior and public-launch limits.
 
 Three clearly labeled illustrative listings are inserted into a new local database. They are examples only and are not real vacancies.
@@ -68,6 +69,12 @@ This project includes a Dockerfile and Render Blueprint for a single-service dep
 4. Leave `GEMINI_API_KEY` unset for built-in feedback. If you choose to enable Gemini, add the key in Render's secret environment settings; never put it in the frontend or repository.
 
 The public service remains a portfolio demo: its sample listings are not current vacancies, test uploads are temporary, and no applications are sent to employers. Review the privacy and terms drafts and replace the sample listings before presenting the site as an institutional placement service. A custom domain also requires ownership of a domain and DNS configuration. See [Render's Blueprint reference](https://render.com/docs/blueprint-spec) for deployment settings.
+
+## Resume & interview coach
+
+The coach is available from the Interview coach navigation item or the Overview resume panel. Resume PDF, DOCX, and TXT text extraction and ATS-style checklist scoring run in the browser; image-only PDFs need OCR, which the demo does not include. The ATS-style estimate is a transparent practice checklist, not an employer ATS score or hiring recommendation. The browser voice speaks interview questions; speech recognition availability depends on the browser. Camera access is optional and only previews locally. The DSA editor uses a restricted ES5 JavaScript interpreter and visible test cases; modern syntax such as `let`, `const`, and arrow functions is not supported.
+
+When Gemini is configured, the user must opt in before interview text is sent to Google. Email addresses, phone numbers, and links are redacted in the browser and server. Resume files and camera video are not sent.
 
 ## Optional Gemini setup
 

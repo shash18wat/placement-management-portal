@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Icon } from './icons.jsx'
+const InterviewCoach = lazy(() => import('./InterviewCoach.jsx'))
 
 const sampleOpportunities = [
   {
@@ -61,6 +62,7 @@ const navItems = [
   { id: 'opportunities', label: 'Opportunities', icon: 'roles' },
   { id: 'applications', label: 'My applications', icon: 'applications' },
   { id: 'feedback', label: 'AI feedback', icon: 'feedback' },
+  { id: 'interview', label: 'Interview coach', icon: 'interview' },
 ]
 
 function readLocal(key, fallback) {
@@ -192,7 +194,7 @@ function PrivacyContent({ publicDemo, resumeUploadsEnabled }) {
   return (
     <div className="legal-copy">
       <section><h2>What this project stores</h2>{publicDemo ? <><p>This public portfolio demo has no user accounts. Your profile and saved roles stay in your browser. Eligibility requests send only the listing ID, GPA, and backlog count to the API for comparison; the API does not save those values. {publicUploadNotice}</p><p>The feedback service receives the role, skills, and text you submit. This demo uses built-in checks unless an AI provider is explicitly configured. If Gemini is enabled, the page asks for consent before sending the text to Google. Do not include contact details or sensitive information in feedback.</p></> : <><p>This local portfolio demo has no user accounts or coordinator sign-in. Your student profile is saved in local browser storage. Company, opportunity, and application records are stored by the local FastAPI service in a SQLite database under the project data folder. A submitted PDF or DOCX resume is stored there as a separate file. These records are not sent to an employer or placement office.</p><p>The coordinator screens are available without authentication in this local demo. Anyone who can reach the service can view or change those records. Use fictional data only, keep the service bound to your own computer, and do not expose it to the internet.</p></>}</section>
-      <section><h2>AI feedback</h2><p>When the Gemini service is not configured, the built-in review checks the text you submit and does not call an external AI provider. When Gemini is configured, the target role, skills, and resume summary are sent from the server to Google Gemini only after you choose to request feedback and confirm the notice. The portal API does not store review text.</p><p>Do not submit contact details, protected or sensitive personal information, or real applicant records to this portfolio demo. AI suggestions can be incomplete or wrong and should be reviewed by a person.</p></section>
+      <section><h2>AI feedback</h2><p>When the Gemini service is not configured, the built-in review checks the text you submit and does not call an external AI provider. When Gemini is configured, the target role, skills, and resume summary are sent from the server to Google Gemini only after you choose to request feedback and confirm the notice. The portal API does not store review text. The Resume & interview coach reads PDF, DOCX, and TXT text in your browser; its resume file is not uploaded by the scan, and scan text stays in the active tab. If Gemini is configured and you opt in, the role, contact-redacted resume excerpt, and interview answers go through this portal to Google Gemini. Remove your name or address before opting in for practice questions and coaching. The optional camera is a local preview and is not recorded or uploaded. Browser voice typing may process audio through your browser provider; this portal does not record audio.</p><p>Do not submit contact details, protected or sensitive personal information, or real applicant records to this portfolio demo. AI suggestions can be incomplete or wrong and should be reviewed by a person.</p></section>
       <section><h2>Analytics and cookies</h2><p>This build does not include advertising trackers, analytics scripts, or third-party review widgets. Browser storage is used for the profile and SQLite plus local files are used for coordinator and application demo data.</p></section>
       <section><h2>Data control</h2><p>{publicDemo ? 'Clear your profile by clearing this site’s browser data. Public test uploads are not available in a coordinator dashboard; the demo removes their records after 24 hours on subsequent activity, and Render may erase them earlier when its free service restarts or spins down.' : 'Clear your profile by clearing this site’s browser data. Remove a submitted demo application from the Applications page to delete its database record and stored resume file. Company and opportunity records can be removed from the Companies page when no applications depend on them. The project owner can reset all demo records by stopping the service and deleting the project data folder.'}</p><p>A future institutional deployment must document its data controller, access rules, retention period, deletion process, and contact channel before collecting real student or employer information.</p></section>
     </div>
@@ -305,7 +307,7 @@ function App() {
   }), [opportunities, query])
 
   const profileComplete = Boolean(profile.fullName && profile.email && profile.program && profile.graduationYear && profile.targetRole && profile.skills && profile.resumeSummary)
-  const pageNames = { overview: 'Overview', companies: 'Company management', opportunities: 'Opportunities', applications: 'Applications', feedback: 'AI feedback', profile: 'Student profile' }
+  const pageNames = { overview: 'Overview', companies: 'Company management', opportunities: 'Opportunities', applications: 'Applications', feedback: 'AI feedback', interview: 'Interview coach', profile: 'Student profile' }
 
   function showNotice(message) {
     setNotice(message)
@@ -504,6 +506,7 @@ function App() {
           {section === 'applications' && <Applications items={applications} onRemove={removeApplication} onStatusChange={updateApplicationStatus} onBrowse={() => goTo('opportunities')} connected={portalConnected} />}
           {section === 'profile' && <Profile profile={profile} setProfile={setProfile} onReview={syncProfileToReview} onSaved={() => showNotice('Profile saved in this browser.')} />}
           {section === 'feedback' && <Feedback form={reviewForm} setForm={setReviewForm} onSubmit={requestReview} busy={reviewBusy} result={reviewResult} label={reviewLabel} geminiEnabled={geminiEnabled} consent={consentToAi} setConsent={setConsentToAi} />}
+          {section === 'interview' && <Suspense fallback={<div className="coach-loading" role="status">Opening practice studio…</div>}><InterviewCoach profile={profile} opportunities={opportunities} geminiEnabled={geminiEnabled} /></Suspense>}
         </main>
 
         <footer className="page-footer"><span>Placement Management Portal · Portfolio demonstration</span><span><a href="/privacy">Privacy</a><a href="/terms">Terms</a></span></footer>
@@ -533,7 +536,7 @@ function Overview({ profile, profileComplete, applications, companies, opportuni
         <button className="button button--secondary" onClick={() => profileComplete ? onReview() : onNavigate('profile')}>{profileComplete ? 'Review my resume' : 'Complete profile'}<Icon name="arrow" size={16} /></button>
       </div>
       <section className="panel resume-tools-panel" aria-label="Resume tools">
-        <div className="panel-heading"><div><p className="eyebrow">RESUME TOOLS</p><h2>Upload a resume or review your summary</h2></div></div>
+        <div className="panel-heading"><div><p className="eyebrow">RESUME TOOLS</p><h2>Upload a resume or review your summary</h2></div><button className="button button--secondary" onClick={() => onNavigate('interview')}>Resume scan & interview<Icon name="arrow" size={15} /></button></div>
         <div className="resume-tool-grid">
           <div className="resume-tool-card">
             <span className="action-icon"><Icon name="document" size={19} /></span>

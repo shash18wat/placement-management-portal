@@ -18,6 +18,44 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         yield test_client
 
 
+
+def test_interview_practice_uses_built_in_rounds_without_ai(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    question = client.post(
+        "/api/interview",
+        json={
+            "action": "question",
+            "round_name": "resume",
+            "target_role": "Software Intern",
+            "resume_excerpt": "Projects\nBuilt a Flask portal with test cases and measured response time.",
+        },
+    )
+    assert question.status_code == 200
+    assert question.json()["source"] == "built_in"
+    assert "resume mentions" in question.json()["question"]
+
+    feedback = client.post(
+        "/api/interview",
+        json={
+            "action": "evaluate",
+            "round_name": "resume",
+            "previous_question": question.json()["question"],
+            "answer": "I built the project and tested the result with several cases.",
+        },
+    )
+    assert feedback.status_code == 200
+    assert {"feedback", "strength", "improvement"} <= feedback.json().keys()
+
+
+def test_interview_requires_consent_before_configured_ai(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    response = client.post(
+        "/api/interview",
+        json={"action": "question", "round_name": "behavioral", "resume_excerpt": "sample text"},
+    )
+    assert response.status_code == 400
+    assert "Consent is required" in response.json()["detail"]
+
 def test_example_records_are_created(client: TestClient) -> None:
     companies = client.get("/api/companies").json()
     opportunities = client.get("/api/opportunities").json()
