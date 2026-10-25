@@ -852,3 +852,24 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .interview-coach .interview-roadmap { gap: 7px; }
   .interview-coach .roadmap-card { min-height: 100px; padding: 11px; }
 }
+
+.interview-coach .page-heading {
+  padding: 23px 25px;
+  border: 1px solid rgba(218, 177, 111, .42);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 92% 12%, rgba(203, 157, 84, .2), transparent 32%),
+    linear-gradient(122deg, #35131f 0%, #5c2033 62%, #431725 100%);
+  box-shadow: 0 12px 30px rgba(47, 19, 29, .16);
+}
+.interview-coach .page-heading h1 { color: #fff8ed; }
+.interview-coach .page-heading .eyebrow { color: #e5c17d; }
+.interview-coach .page-heading .page-description { color: #f0ded2; }
+.interview-coach .page-heading .status-chip {
+  border-color: rgba(229, 193, 125, .42);
+  color: #f6e3bf;
+  background: rgba(255, 255, 255, .08);
+}
+@media (max-width: 620px) {
+  .interview-coach .page-heading { padding: 18px; }
+}
