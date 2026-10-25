@@ -297,3 +297,30 @@ def test_public_demo_uploads_are_rate_limited(client: TestClient, monkeypatch: p
 
     responses = [client.post("/api/resume-submissions", **submission) for _ in range(4)]
     assert [response.status_code for response in responses] == [201, 201, 201, 429]
+
+def test_builtin_interview_questions_progress_by_index() -> None:
+    questions = []
+    for index in range(5):
+        request = main.InterviewRequest(
+            action="question",
+            round_name="resume",
+            target_role="Software Intern",
+            resume_excerpt="Projects\nBuilt a Flask portal with test cases and measured response time.",
+            interviewer_level="barraiser",
+            question_index=index,
+        )
+        questions.append(main._interview_local(request)["question"])
+
+    assert len(set(questions)) == 5
+    assert "resume mentions" in questions[0].lower()
+    assert questions[0].startswith("Be specific:")
+    assert "trade-off" in questions[4]
+
+
+def test_interviewer_style_is_validated() -> None:
+    with pytest.raises(ValueError):
+        main.InterviewRequest(
+            action="question",
+            round_name="resume",
+            interviewer_level="hostile",
+        )
